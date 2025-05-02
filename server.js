@@ -1,9 +1,11 @@
-
 require('dotenv').config();
 const axios = require('axios');
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 let lastSeenPost = "";
 
@@ -24,20 +26,15 @@ const fetchAndNotify = async () => {
         if (id === lastSeenPost) return;
 
         if (KEYWORDS.some(k => title.includes(k))) {
-          console.log("🔔 Match found:", title);
+          console.log("📢 Match found:", title);
 
-          // Send pushover notification
-          await axios.post("https://api.pushover.net/1/messages.json", null, {
-            params: {
-              token: process.env.PUSHOVER_APP_TOKEN,
-              user: process.env.PUSHOVER_USER_KEY,
-              title: "Reddit Keyword Match",
-              message: title,
-              priority: 0,
-              url: "https://reddit.com" + postData.permalink,
-              url_title: "View on Reddit"
-            }
+          // Send Telegram alert
+          await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: `🔔 *Reddit match:*\n${postData.title}\n\n🔗 https://reddit.com${postData.permalink}`,
+            parse_mode: "Markdown"
           });
+
           lastSeenPost = id;
           return;
         }
@@ -48,10 +45,10 @@ const fetchAndNotify = async () => {
   }
 };
 
-setInterval(fetchAndNotify, 59000); // check every 59 seconds
+setInterval(fetchAndNotify, 5000); // Every 5 seconds
 
 app.get("/", (req, res) => {
-  res.send("✅ Reddit keyword monitor is running.");
+  res.send("✅ Telegram keyword monitor is running.");
 });
 
 app.listen(PORT, () => console.log("Server running on port", PORT));
