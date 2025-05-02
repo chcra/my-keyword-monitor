@@ -13,7 +13,7 @@ const KEYWORDS = ["india", "indian", "indians"];
 const fetchAndNotify = async () => {
   try {
     for (const sub of SUBREDDITS) {
-      const res = await axios.get(\`https://www.reddit.com/r/\${sub}/new.json?limit=5\`);
+      const res = await axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=5`);
       const posts = res.data.data.children;
 
       for (const post of posts) {
