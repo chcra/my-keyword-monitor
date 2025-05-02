@@ -45,7 +45,7 @@ const fetchAndNotify = async () => {
   }
 };
 
-setInterval(fetchAndNotify, 5000); // Every 5 seconds
+setInterval(fetchAndNotify, 45000); // Every 45 seconds
 
 app.get("/", (req, res) => {
   res.send("✅ Telegram keyword monitor is running.");
