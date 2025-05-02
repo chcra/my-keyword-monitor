@@ -1,5 +1,5 @@
 {
-  "name": "reddit-keyword-monitor",
+  "name": "my-keyword-monitor",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
