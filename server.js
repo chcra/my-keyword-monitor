@@ -33,6 +33,7 @@ const fetchAndNotify = async () => {
               user: process.env.PUSHOVER_USER_KEY,
               title: "Reddit Keyword Match",
               message: title,
+              priority: 0,
               url: "https://reddit.com" + postData.permalink,
               url_title: "View on Reddit"
             }
