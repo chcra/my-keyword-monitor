@@ -4,10 +4,8 @@ const axios = require('axios');
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-
 const SUBREDDITS = ["xbox", "xboxgamepass", "xboxseriess"];
 const KEYWORDS = ["india", "indian", "indians"];
-
 
 let lastSeen = {};
 
@@ -16,6 +14,7 @@ async function sendTelegramMessage(text) {
     const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       chat_id: TELEGRAM_CHAT_ID,
       text,
+      parse_mode: 'Markdown'
     });
     console.log('✅ Sent Telegram message:', res.data.ok);
   } catch (error) {
@@ -23,15 +22,22 @@ async function sendTelegramMessage(text) {
   }
 }
 
+async function fetchSubredditJSON(sub) {
+  const url = `https://www.reddit.com/r/${sub}/new.json?limit=5`;
+
+  return axios.get(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MonitorB/1.0',
+      'Accept': 'application/json',
+      'Referer': `https://www.reddit.com/r/${sub}/`,
+    }
+  });
+}
+
 async function checkSubreddits() {
   for (const sub of SUBREDDITS) {
     try {
-      const res = await axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=5`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; RedditKeywordMonitor/1.0; +https://github.com/yourusername)'
-        }
-      });
-
+      const res = await fetchSubredditJSON(sub);
       const posts = res.data.data.children;
 
       for (const post of posts) {
