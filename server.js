@@ -1,54 +1,57 @@
-require('dotenv').config();
-const axios = require('axios');
-const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000;
+const axios = require("axios");
+
+// Load .env if running locally (Render handles this automatically)
+require("dotenv").config();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-let lastSeenPost = "";
-
 const SUBREDDITS = ["xbox", "xboxgamepass", "xboxseriess"];
 const KEYWORDS = ["india", "indian", "indians"];
 
-const fetchAndNotify = async () => {
+let seenPostIds = new Set();
+
+async function sendTelegramMessage(text) {
   try {
-    for (const sub of SUBREDDITS) {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "HTML",
+    };
+    const response = await axios.post(url, payload);
+    console.log("✅ Sent Telegram message:", response.data.ok);
+  } catch (err) {
+    console.error("❌ Error sending Telegram message:", err.response?.data || err.message);
+  }
+}
+
+async function checkSubreddits() {
+  for (const sub of SUBREDDITS) {
+    try {
       const res = await axios.get(`https://www.reddit.com/r/${sub}/new.json?limit=5`);
       const posts = res.data.data.children;
 
       for (const post of posts) {
-        const postData = post.data;
-        const title = postData.title.toLowerCase();
-        const id = postData.id;
+        const { id, title, permalink } = post.data;
+        const lowerTitle = title.toLowerCase();
 
-        if (id === lastSeenPost) return;
-
-        if (KEYWORDS.some(k => title.includes(k))) {
-          console.log("📢 Match found:", title);
-
-          // Send Telegram alert
-          await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            chat_id: TELEGRAM_CHAT_ID,
-            text: `🔔 *Reddit match:*\n${postData.title}\n\n🔗 https://reddit.com${postData.permalink}`,
-            parse_mode: "Markdown"
-          });
-
-          lastSeenPost = id;
-          return;
+        if (!seenPostIds.has(id) && KEYWORDS.some(kw => lowerTitle.includes(kw))) {
+          const link = `https://reddit.com${permalink}`;
+          await sendTelegramMessage(`🔔 <b>${title}</b>\n${link}`);
+          seenPostIds.add(id);
         }
       }
+    } catch (err) {
+      console.error(`❌ Error checking /r/${sub}:`, err.response?.data || err.message);
     }
-  } catch (err) {
-    console.error("Error during fetch/notify:", err.message);
   }
-};
+}
 
-setInterval(fetchAndNotify, 45000); // Every 45 seconds
+// Initial test message to confirm it's working
+(async () => {
+  await sendTelegramMessage("✅ Telegram keyword monitor started!");
+})();
 
-app.get("/", (req, res) => {
-  res.send("✅ Telegram keyword monitor is running.");
-});
-
-app.listen(PORT, () => console.log("Server running on port", PORT));
+// Check every 60 seconds
+setInterval(checkSubreddits, 60 * 1000);
