@@ -1,62 +1,39 @@
+const snoowrap = require('snoowrap');
 require('dotenv').config();
-const axios = require('axios');
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const monitoredSubs = ['xbox', 'xboxseriess', 'xboxgamepass'];
+const keywords = ['india', 'indian', 'indians'];
+const seenPostIds = new Set();
 
-const SUBREDDITS = ["xbox", "xboxgamepass", "xboxseriess"];
-const KEYWORDS = ["india", "indian", "indians"];
+const r = new snoowrap({
+  userAgent: 'reddit-monitor-script',
+  clientId: process.env.REDDIT_CLIENT_ID,
+  clientSecret: process.env.REDDIT_CLIENT_SECRET,
+  refreshToken: process.env.REDDIT_REFRESH_TOKEN
+});
 
-let lastSeen = {};
-
-async function sendTelegramMessage(text) {
+async function checkSubreddit(subreddit) {
   try {
-    const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      chat_id: TELEGRAM_CHAT_ID,
-      text,
-      parse_mode: 'Markdown'
-    });
-    console.log('✅ Sent Telegram message:', res.data.ok);
-  } catch (error) {
-    console.error('❌ Error sending Telegram message:', error.message);
-  }
-}
-
-async function fetchSubredditJSON(sub) {
-  const url = `https://www.reddit.com/r/${sub}/new.json?limit=5`;
-
-  return axios.get(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) MonitorB/1.0',
-      'Accept': 'application/json',
-      'Referer': `https://www.reddit.com/r/${sub}/`,
-    }
-  });
-}
-
-async function checkSubreddits() {
-  for (const sub of SUBREDDITS) {
-    try {
-      const res = await fetchSubredditJSON(sub);
-      const posts = res.data.data.children;
-
-      for (const post of posts) {
-        const { id, title, permalink } = post.data;
-        if (lastSeen[sub] === id) break;
-
-        const lower = title.toLowerCase();
-        if (KEYWORDS.some(word => lower.includes(word))) {
-          const link = `https://reddit.com${permalink}`;
-          await sendTelegramMessage(`📣 *Match in r/${sub}*:\n${title}\n${link}`);
+    const posts = await r.getSubreddit(subreddit).getNew({ limit: 10 });
+    for (const post of posts) {
+      if (!seenPostIds.has(post.id)) {
+        const content = `${post.title} ${post.selftext}`.toLowerCase();
+        if (keywords.some(k => content.includes(k))) {
+          console.log(`[MATCH] r/${subreddit} - ${post.title} (${post.url})`);
         }
+        seenPostIds.add(post.id);
       }
-
-      if (posts.length > 0) lastSeen[sub] = posts[0].data.id;
-    } catch (err) {
-      console.error(`❌ Error checking /r/${sub}:`, err.response?.data || err.message);
     }
+  } catch (err) {
+    console.error(`❌ Error checking /r/${subreddit}:`, err.message);
   }
 }
 
-setInterval(checkSubreddits, 15000); // every 15 seconds
-checkSubreddits();
+async function monitor() {
+  for (const sub of monitoredSubs) {
+    await checkSubreddit(sub);
+  }
+}
+
+setInterval(monitor, 60 * 1000); // every 60 seconds
+console.log("✅ Reddit keyword monitor started.");
